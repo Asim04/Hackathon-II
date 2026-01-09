@@ -1,0 +1,735 @@
+openapi: 3.1.0
+info:
+  title: Todo Application Frontend API
+  description: API specification for the Next.js frontend application communicating with the FastAPI backend
+  version: 1.0.0
+  contact:
+    name: Frontend Team
+    email: frontend@example.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.production.example.com
+    description: Production server (Railway deployment)
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints (signup, signin, signout)
+  - name: Tasks
+    description: Task CRUD operations
+
+paths:
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user account
+      description: Creates a new user account with email and password. Returns JWT token on success.
+      operationId: signUp
+      security: []  # No auth required for signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+            example:
+              email: user@example.com
+              password: securepassword123
+              confirmPassword: securepassword123
+      responses:
+        '201':
+          description: User account created successfully
+          headers:
+            Set-Cookie:
+              description: JWT token stored in httpOnly cookie
+              schema:
+                type: string
+                example: auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=Strict; Max-Age=604800
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                user:
+                  id: 550e8400-e29b-41d4-a716-446655440000
+                  email: user@example.com
+                  createdAt: '2026-01-06T12:00:00Z'
+                  updatedAt: '2026-01-06T12:00:00Z'
+                message: Account created successfully
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidEmail:
+                  value:
+                    error: Validation Error
+                    message: Invalid email format
+                    statusCode: 400
+                passwordMismatch:
+                  value:
+                    error: Validation Error
+                    message: Passwords do not match
+                    statusCode: 400
+        '409':
+          description: Conflict (email already exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Conflict
+                message: Email already exists
+                statusCode: 409
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/signin:
+    post:
+      tags:
+        - Authentication
+      summary: Sign in to existing user account
+      description: Authenticates user with email and password. Returns JWT token on success.
+      operationId: signIn
+      security: []  # No auth required for signin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+            example:
+              email: user@example.com
+              password: securepassword123
+              rememberMe: true
+      responses:
+        '200':
+          description: Authentication successful
+          headers:
+            Set-Cookie:
+              description: JWT token stored in httpOnly cookie
+              schema:
+                type: string
+                example: auth_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Secure; SameSite=Strict; Max-Age=604800
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                user:
+                  id: 550e8400-e29b-41d4-a716-446655440000
+                  email: user@example.com
+                  createdAt: '2026-01-01T10:00:00Z'
+                  updatedAt: '2026-01-06T12:00:00Z'
+                message: Signed in successfully
+        '401':
+          description: Unauthorized (invalid credentials)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Unauthorized
+                message: Invalid email or password
+                statusCode: 401
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/signout:
+    post:
+      tags:
+        - Authentication
+      summary: Sign out from user account
+      description: Invalidates JWT token and clears authentication cookie.
+      operationId: signOut
+      responses:
+        '200':
+          description: Signed out successfully
+          headers:
+            Set-Cookie:
+              description: Clear auth_token cookie
+              schema:
+                type: string
+                example: auth_token=; HttpOnly; Secure; SameSite=Strict; Max-Age=0
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Signed out successfully
+        '401':
+          description: Unauthorized (no valid token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/tasks:
+    get:
+      tags:
+        - Tasks
+      summary: Get all tasks for authenticated user
+      description: Returns list of all tasks belonging to the authenticated user, optionally filtered by completion status.
+      operationId: getTasks
+      parameters:
+        - name: status
+          in: query
+          description: Filter tasks by completion status
+          required: false
+          schema:
+            type: string
+            enum:
+              - all
+              - active
+              - completed
+            default: all
+        - name: sortBy
+          in: query
+          description: Sort tasks by field
+          required: false
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - updatedAt
+              - title
+            default: createdAt
+        - name: order
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  message:
+                    type: string
+                    example: Tasks retrieved successfully
+              example:
+                data:
+                  - id: 123e4567-e89b-12d3-a456-426614174000
+                    userId: 550e8400-e29b-41d4-a716-446655440000
+                    title: Complete project documentation
+                    description: Write API docs and user guide
+                    completed: false
+                    createdAt: '2026-01-06T10:00:00Z'
+                    updatedAt: '2026-01-06T10:00:00Z'
+                  - id: 987fcdeb-51a2-43e1-b456-123456789abc
+                    userId: 550e8400-e29b-41d4-a716-446655440000
+                    title: Buy groceries
+                    description: null
+                    completed: true
+                    createdAt: '2026-01-05T14:30:00Z'
+                    updatedAt: '2026-01-06T09:15:00Z'
+                message: Tasks retrieved successfully
+        '401':
+          description: Unauthorized (invalid or missing token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task
+      description: Creates a new task for the authenticated user.
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+            example:
+              title: Complete project documentation
+              description: Write API docs and user guide
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Task'
+                  message:
+                    type: string
+              example:
+                data:
+                  id: 123e4567-e89b-12d3-a456-426614174000
+                  userId: 550e8400-e29b-41d4-a716-446655440000
+                  title: Complete project documentation
+                  description: Write API docs and user guide
+                  completed: false
+                  createdAt: '2026-01-06T12:00:00Z'
+                  updatedAt: '2026-01-06T12:00:00Z'
+                message: Task created successfully
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingTitle:
+                  value:
+                    error: Validation Error
+                    message: Title is required
+                    statusCode: 400
+                titleTooLong:
+                  value:
+                    error: Validation Error
+                    message: Title must be less than 100 characters
+                    statusCode: 400
+        '401':
+          description: Unauthorized (invalid or missing token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/tasks/{taskId}:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        description: UUID of the task
+        schema:
+          type: string
+          format: uuid
+        example: 123e4567-e89b-12d3-a456-426614174000
+
+    get:
+      tags:
+        - Tasks
+      summary: Get a single task by ID
+      description: Returns a specific task belonging to the authenticated user.
+      operationId: getTask
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Task'
+                  message:
+                    type: string
+              example:
+                data:
+                  id: 123e4567-e89b-12d3-a456-426614174000
+                  userId: 550e8400-e29b-41d4-a716-446655440000
+                  title: Complete project documentation
+                  description: Write API docs and user guide
+                  completed: false
+                  createdAt: '2026-01-06T10:00:00Z'
+                  updatedAt: '2026-01-06T10:00:00Z'
+                message: Task retrieved successfully
+        '401':
+          description: Unauthorized (invalid or missing token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (task belongs to another user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Forbidden
+                message: You do not have permission to access this task
+                statusCode: 403
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Not Found
+                message: Task not found
+                statusCode: 404
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Tasks
+      summary: Update an existing task
+      description: Updates one or more fields of a task. Only provided fields are updated.
+      operationId: updateTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+            examples:
+              updateTitle:
+                summary: Update title only
+                value:
+                  title: Complete project documentation and testing
+              toggleComplete:
+                summary: Toggle completion status
+                value:
+                  completed: true
+              updateAll:
+                summary: Update all fields
+                value:
+                  title: Complete project documentation and testing
+                  description: Write API docs, user guide, and add unit tests
+                  completed: false
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Task'
+                  message:
+                    type: string
+              example:
+                data:
+                  id: 123e4567-e89b-12d3-a456-426614174000
+                  userId: 550e8400-e29b-41d4-a716-446655440000
+                  title: Complete project documentation and testing
+                  description: Write API docs, user guide, and add unit tests
+                  completed: false
+                  createdAt: '2026-01-06T10:00:00Z'
+                  updatedAt: '2026-01-06T13:30:00Z'
+                message: Task updated successfully
+        '400':
+          description: Bad request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (invalid or missing token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (task belongs to another user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Tasks
+      summary: Delete a task
+      description: Permanently deletes a task. This action cannot be undone.
+      operationId: deleteTask
+      responses:
+        '200':
+          description: Task deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Task deleted successfully
+        '401':
+          description: Unauthorized (invalid or missing token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (task belongs to another user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/signin or /auth/signup endpoints. Token is also stored in httpOnly cookie for automatic inclusion.
+
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+          example: 550e8400-e29b-41d4-a716-446655440000
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: user@example.com
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: '2026-01-01T10:00:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last profile update timestamp
+          example: '2026-01-06T12:00:00Z'
+
+    Task:
+      type: object
+      required:
+        - id
+        - userId
+        - title
+        - completed
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique task identifier
+          example: 123e4567-e89b-12d3-a456-426614174000
+        userId:
+          type: string
+          format: uuid
+          description: ID of the user who owns this task
+          example: 550e8400-e29b-41d4-a716-446655440000
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Task title
+          example: Complete project documentation
+        description:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Optional task description
+          example: Write API docs and user guide
+        completed:
+          type: boolean
+          description: Task completion status
+          default: false
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          description: Task creation timestamp
+          example: '2026-01-06T10:00:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last modification timestamp
+          example: '2026-01-06T10:00:00Z'
+
+    SignUpRequest:
+      type: object
+      required:
+        - email
+        - password
+        - confirmPassword
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address (RFC 5322 compliant)
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+          description: User's password (minimum 8 characters)
+          example: securepassword123
+        confirmPassword:
+          type: string
+          format: password
+          description: Password confirmation (must match password)
+          example: securepassword123
+
+    SignInRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          description: User's password
+          example: securepassword123
+        rememberMe:
+          type: boolean
+          description: Extend token expiry (7 days instead of 15 minutes)
+          default: false
+          example: true
+
+    AuthResponse:
+      type: object
+      required:
+        - user
+        - message
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        message:
+          type: string
+          example: Signed in successfully
+
+    CreateTaskRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Task title
+          example: Complete project documentation
+        description:
+          type: string
+          maxLength: 500
+          description: Optional task description
+          example: Write API docs and user guide
+
+    UpdateTaskRequest:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Updated task title
+          example: Complete project documentation and testing
+        description:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Updated task description (can be null to clear)
+          example: Write API docs, user guide, and add unit tests
+        completed:
+          type: boolean
+          description: Updated completion status
+          example: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: Validation Error
+        message:
+          type: string
+          description: Human-readable error message
+          example: Title is required
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          type: object
+          description: Additional error details (optional)
+          additionalProperties: true

@@ -71,17 +71,23 @@ app = FastAPI(
 )
 
 # Configure CORS middleware
+# --- CORS SETTINGS START ---
+# Yahan humne origins ko define kiya hai taake Vercel block na ho
+origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://hackathon-ii-two.vercel.app",
+    "https://hackathon-ii-git-main-muhammad-asim-khans-projects.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://*.vercel.app",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- CORS SETTINGS END ---
 
 # Include routers
 app.include_router(auth.router)

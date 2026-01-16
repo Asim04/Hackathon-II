@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit)",
+      "Bash(node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit)",
+      "Bash(cd D:ASIM DOUCOMENTcodeQ_4hackathonhackthon_2todo-app)",
+      "Bash(mkdir:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(timeout:*)",
+      "Bash(exit 0)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(echo:*)",
+      "Bash(echo \"  • Health: http://localhost:8000/health\")",
+      "Bash(pip install:*)",
+      "Bash(node test-chat-auth.js:*)",
+      "Bash(taskkill //F //PID 24668)",
+      "Bash(npm run dev:*)"
+    ]
+  }
+}

@@ -1,0 +1,439 @@
+openapi: 3.0.3
+info:
+  title: MCP Tools Specification
+  description: |
+    Model Context Protocol (MCP) tools for task management operations.
+    These tools are invoked by the AI agent to perform database operations.
+
+    Design Principles:
+    - Stateless: No in-memory state, database-backed
+    - User-scoped: All tools require user_id parameter
+    - Consistent: Uniform response format across all tools
+    - Secure: User isolation enforced at database query level
+  version: 3.0.0
+
+components:
+  schemas:
+    # Tool 1: add_task
+    AddTaskInput:
+      type: object
+      required:
+        - user_id
+        - title
+      properties:
+        user_id:
+          type: string
+          description: User ID (injected by agent for security)
+          example: "user_123"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Task title
+          example: "Buy milk"
+        description:
+          type: string
+          maxLength: 1000
+          description: Optional task description
+          example: "Get 2% milk from grocery store"
+
+    AddTaskOutput:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: ID of created task
+          example: 5
+        status:
+          type: string
+          enum: [created]
+          description: Operation status
+          example: "created"
+        title:
+          type: string
+          description: Task title (confirmation)
+          example: "Buy milk"
+
+    # Tool 2: list_tasks
+    ListTasksInput:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: User ID (injected by agent for security)
+          example: "user_123"
+        status:
+          type: string
+          enum: [all, pending, completed]
+          default: all
+          description: Filter tasks by completion status
+          example: "pending"
+
+    ListTasksOutput:
+      type: array
+      items:
+        type: object
+        required:
+          - id
+          - title
+          - completed
+        properties:
+          id:
+            type: integer
+            description: Task ID
+            example: 1
+          title:
+            type: string
+            description: Task title
+            example: "Buy milk"
+          description:
+            type: string
+            description: Task description (if present)
+            example: "Get 2% milk"
+          completed:
+            type: boolean
+            description: Completion status
+            example: false
+          created_at:
+            type: string
+            format: date-time
+            description: When task was created
+            example: "2026-01-13T10:00:00Z"
+
+    # Tool 3: complete_task
+    CompleteTaskInput:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: User ID (injected by agent for security)
+          example: "user_123"
+        task_id:
+          type: integer
+          description: ID of task to complete
+          example: 3
+
+    CompleteTaskOutput:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: ID of completed task
+          example: 3
+        status:
+          type: string
+          enum: [completed]
+          description: Operation status
+          example: "completed"
+        title:
+          type: string
+          description: Task title (confirmation)
+          example: "Call dentist"
+
+    # Tool 4: delete_task
+    DeleteTaskInput:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: User ID (injected by agent for security)
+          example: "user_123"
+        task_id:
+          type: integer
+          description: ID of task to delete
+          example: 2
+
+    DeleteTaskOutput:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: ID of deleted task
+          example: 2
+        status:
+          type: string
+          enum: [deleted]
+          description: Operation status
+          example: "deleted"
+        title:
+          type: string
+          description: Task title (confirmation)
+          example: "Old meeting"
+
+    # Tool 5: update_task
+    UpdateTaskInput:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: User ID (injected by agent for security)
+          example: "user_123"
+        task_id:
+          type: integer
+          description: ID of task to update
+          example: 1
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: New task title (optional)
+          example: "Buy almond milk"
+        description:
+          type: string
+          maxLength: 1000
+          description: New task description (optional)
+          example: "Get unsweetened almond milk"
+
+    UpdateTaskOutput:
+      type: object
+      required:
+        - task_id
+        - status
+        - title
+      properties:
+        task_id:
+          type: integer
+          description: ID of updated task
+          example: 1
+        status:
+          type: string
+          enum: [updated]
+          description: Operation status
+          example: "updated"
+        title:
+          type: string
+          description: Updated task title
+          example: "Buy almond milk"
+
+    # Error response (all tools)
+    ToolError:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          enum:
+            - not_found
+            - validation_error
+            - internal_error
+          description: Error code
+          example: "not_found"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Task 99 not found"
+
+# MCP Tool Definitions
+tools:
+  - name: add_task
+    description: Create a new task for the user
+    input_schema:
+      $ref: '#/components/schemas/AddTaskInput'
+    output_schema:
+      oneOf:
+        - $ref: '#/components/schemas/AddTaskOutput'
+        - $ref: '#/components/schemas/ToolError'
+    examples:
+      success:
+        input:
+          user_id: "user_123"
+          title: "Buy milk"
+        output:
+          task_id: 5
+          status: "created"
+          title: "Buy milk"
+      error:
+        input:
+          user_id: "user_123"
+          title: ""
+        output:
+          error: "validation_error"
+          message: "Title cannot be empty"
+
+  - name: list_tasks
+    description: Retrieve user's tasks filtered by completion status
+    input_schema:
+      $ref: '#/components/schemas/ListTasksInput'
+    output_schema:
+      oneOf:
+        - $ref: '#/components/schemas/ListTasksOutput'
+        - $ref: '#/components/schemas/ToolError'
+    examples:
+      success:
+        input:
+          user_id: "user_123"
+          status: "pending"
+        output:
+          - id: 1
+            title: "Buy milk"
+            completed: false
+          - id: 2
+            title: "Call dentist"
+            completed: false
+      empty:
+        input:
+          user_id: "user_123"
+          status: "all"
+        output: []
+
+  - name: complete_task
+    description: Mark a task as complete
+    input_schema:
+      $ref: '#/components/schemas/CompleteTaskInput'
+    output_schema:
+      oneOf:
+        - $ref: '#/components/schemas/CompleteTaskOutput'
+        - $ref: '#/components/schemas/ToolError'
+    examples:
+      success:
+        input:
+          user_id: "user_123"
+          task_id: 3
+        output:
+          task_id: 3
+          status: "completed"
+          title: "Call dentist"
+      not_found:
+        input:
+          user_id: "user_123"
+          task_id: 999
+        output:
+          error: "not_found"
+          message: "Task 999 not found"
+
+  - name: delete_task
+    description: Delete a task
+    input_schema:
+      $ref: '#/components/schemas/DeleteTaskInput'
+    output_schema:
+      oneOf:
+        - $ref: '#/components/schemas/DeleteTaskOutput'
+        - $ref: '#/components/schemas/ToolError'
+    examples:
+      success:
+        input:
+          user_id: "user_123"
+          task_id: 2
+        output:
+          task_id: 2
+          status: "deleted"
+          title: "Old meeting"
+      not_found:
+        input:
+          user_id: "user_123"
+          task_id: 999
+        output:
+          error: "not_found"
+          message: "Task 999 not found"
+
+  - name: update_task
+    description: Update task title or description
+    input_schema:
+      $ref: '#/components/schemas/UpdateTaskInput'
+    output_schema:
+      oneOf:
+        - $ref: '#/components/schemas/UpdateTaskOutput'
+        - $ref: '#/components/schemas/ToolError'
+    examples:
+      success:
+        input:
+          user_id: "user_123"
+          task_id: 1
+          title: "Buy almond milk"
+        output:
+          task_id: 1
+          status: "updated"
+          title: "Buy almond milk"
+      not_found:
+        input:
+          user_id: "user_123"
+          task_id: 999
+          title: "New title"
+        output:
+          error: "not_found"
+          message: "Task 999 not found"
+
+# Security Notes
+security:
+  user_isolation:
+    description: |
+      All tools enforce user isolation at the database query level.
+      The user_id parameter is injected by the AI agent (extracted from JWT token)
+      and cannot be manipulated by the user.
+
+      Database queries MUST filter by user_id:
+      - add_task: Creates task with user_id
+      - list_tasks: Filters tasks WHERE user_id = ?
+      - complete_task: Updates task WHERE id = ? AND user_id = ?
+      - delete_task: Deletes task WHERE id = ? AND user_id = ?
+      - update_task: Updates task WHERE id = ? AND user_id = ?
+
+      This prevents users from accessing or modifying other users' tasks.
+
+  input_validation:
+    description: |
+      All tools validate inputs using JSON Schema before execution.
+      Additional validation in application layer (Pydantic models).
+
+      Validation rules:
+      - title: 1-200 characters, non-empty
+      - description: 0-1000 characters
+      - task_id: positive integer
+      - user_id: non-empty string
+      - status: enum (all, pending, completed)
+
+  error_handling:
+    description: |
+      Tools return consistent error format for all failures.
+      Error messages are user-friendly and actionable.
+      Internal errors do not expose sensitive information.
+
+      Error types:
+      - not_found: Task does not exist or belongs to different user
+      - validation_error: Invalid input parameters
+      - internal_error: Database or system error
+
+# Testing Strategy
+testing:
+  unit_tests:
+    - Test each tool independently with mock database
+    - Verify input validation (invalid inputs rejected)
+    - Verify output format (matches schema)
+    - Verify error handling (all error paths covered)
+
+  integration_tests:
+    - Test tools with real database (test database)
+    - Verify user isolation (cannot access other users' tasks)
+    - Verify database transactions (rollback on error)
+    - Verify concurrent operations (no race conditions)
+
+  security_tests:
+    - Test cross-user access attempts (should fail)
+    - Test SQL injection attempts (should be prevented)
+    - Test input boundary conditions (max lengths, special chars)
+    - Test error message leakage (no sensitive info exposed)

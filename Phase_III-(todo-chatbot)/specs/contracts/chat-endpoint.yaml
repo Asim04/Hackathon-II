@@ -1,0 +1,235 @@
+openapi: 3.0.3
+info:
+  title: Todo Chat API
+  description: Conversational AI endpoint for natural language task management
+  version: 3.0.0
+  contact:
+    name: Phase III - AI Chatbot
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: https://api.todo-app.com
+    description: Production
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/chat:
+    post:
+      summary: Send message to AI assistant
+      description: |
+        Send a natural language message to the AI assistant for task management.
+        The assistant will recognize intents (add, list, complete, delete, update tasks)
+        and execute appropriate MCP tools.
+
+        Stateless design: Conversation history is fetched from database on each request.
+      operationId: sendChatMessage
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              newConversation:
+                summary: Start new conversation
+                value:
+                  message: "Add task to buy milk"
+              continueConversation:
+                summary: Continue existing conversation
+                value:
+                  conversation_id: 123
+                  message: "What's on my list?"
+      responses:
+        '200':
+          description: Successful response from AI assistant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                taskCreated:
+                  summary: Task created successfully
+                  value:
+                    conversation_id: 123
+                    response: "Got it! Added 'Buy milk' 📝"
+                    tool_calls:
+                      - tool: "add_task"
+                        arguments:
+                          user_id: "user_123"
+                          title: "Buy milk"
+                tasksList:
+                  summary: Tasks listed
+                  value:
+                    conversation_id: 123
+                    response: "You have 2 tasks: 1. Buy milk, 2. Call dentist"
+                    tool_calls:
+                      - tool: "list_tasks"
+                        arguments:
+                          user_id: "user_123"
+                          status: "pending"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/signin endpoint
+
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        conversation_id:
+          type: integer
+          description: |
+            Optional. Conversation ID to continue existing conversation.
+            If omitted, a new conversation will be created.
+          example: 123
+        message:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: User's natural language message
+          example: "Add task to buy milk"
+
+    ChatResponse:
+      type: object
+      required:
+        - conversation_id
+        - response
+      properties:
+        conversation_id:
+          type: integer
+          description: Conversation ID (new or existing)
+          example: 123
+        response:
+          type: string
+          description: AI assistant's response
+          example: "Got it! Added 'Buy milk' 📝"
+        tool_calls:
+          type: array
+          description: |
+            Optional. List of MCP tools invoked during processing.
+            Useful for debugging and transparency.
+          items:
+            $ref: '#/components/schemas/ToolCall'
+
+    ToolCall:
+      type: object
+      required:
+        - tool
+        - arguments
+      properties:
+        tool:
+          type: string
+          description: Name of the MCP tool invoked
+          enum:
+            - add_task
+            - list_tasks
+            - complete_task
+            - delete_task
+            - update_task
+          example: "add_task"
+        arguments:
+          type: object
+          description: Arguments passed to the tool
+          example:
+            user_id: "user_123"
+            title: "Buy milk"
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "unauthorized"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid or missing JWT token"
+        details:
+          type: object
+          description: Optional additional error details
+          additionalProperties: true
+
+  responses:
+    Unauthorized:
+      description: Authentication failed - invalid or missing JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "unauthorized"
+            message: "Invalid or missing JWT token"
+
+    Forbidden:
+      description: Access denied - conversation belongs to different user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "forbidden"
+            message: "Conversation 123 belongs to a different user"
+
+    NotFound:
+      description: Conversation not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "not_found"
+            message: "Conversation 123 not found"
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "validation_error"
+            message: "Message cannot be empty"
+            details:
+              field: "message"
+              constraint: "minLength"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "internal_error"
+            message: "An unexpected error occurred. Please try again."
+
+tags:
+  - name: Chat
+    description: Conversational AI endpoints for task management

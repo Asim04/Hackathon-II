@@ -1,23 +1,35 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface LoadingSkeletonProps {
   count?: number;
 }
 
 const LoadingSkeleton = ({ count = 6 }: LoadingSkeletonProps) => {
-  const shouldReduceMotion = useReducedMotion();
+  const variants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: i * 0.1,
+        duration: 0.3,
+        ease: "easeOut"
+      }
+    })
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {Array.from({ length: count }).map((_, index) => (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.3, delay: shouldReduceMotion ? 0 : index * 0.1 }}
           className="glass-card rounded-xl p-6 space-y-4"
+          variants={variants}
+          initial="hidden"
+          animate="visible"
+          custom={index}
         >
           {/* Checkbox skeleton */}
           <div className="flex items-start gap-3">

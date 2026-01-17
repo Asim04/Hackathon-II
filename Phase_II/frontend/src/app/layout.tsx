@@ -27,6 +27,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-primary-purple via-primary-blue to-primary-cyan min-h-screen`}
+         suppressHydrationWarning // ← YEH LINE ADD KAREIN
       >
         <Providers>
           {children}
